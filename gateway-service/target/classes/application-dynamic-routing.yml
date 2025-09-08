@@ -1,0 +1,60 @@
+# Sample configuration for dynamic gateway routing
+# This demonstrates the new configuration structure
+
+gateway:
+  routes:
+    - id: user-service-routes
+      uri: http://localhost:8081
+      predicates:
+        - name: Path
+          args:
+            pattern: /user/**
+      filters:
+        - name: CircuitBreaker
+          args:
+            name: user-service-cb
+            fallbackUri: forward:/fallback/user
+        - name: Retry
+          args:
+            retries: 3
+            firstBackoff: 50ms
+            maxBackoff: 500ms
+      metadata:
+        timeout: 5000
+        enabled: true
+        order: 1
+        
+    - id: product-service-routes  
+      uri: http://localhost:8082
+      predicates:
+        - name: Path
+          args:
+            pattern: /product/**
+      filters:
+        - name: CircuitBreaker
+          args:
+            name: product-service-cb
+            fallbackUri: forward:/fallback/product
+        - name: Retry
+          args:
+            retries: 2
+            firstBackoff: 100ms
+            maxBackoff: 1000ms
+      metadata:
+        timeout: 3000
+        enabled: true
+        order: 2
+
+  # Global circuit breaker configuration
+  circuitBreaker:
+    failureRateThreshold: 50
+    waitDurationInOpenState: 10000
+    slidingWindowSize: 10
+    minimumNumberOfCalls: 5
+
+  # Global retry configuration  
+  retry:
+    retries: 3
+    firstBackoff: 50
+    maxBackoff: 500
+    factor: 2.0
