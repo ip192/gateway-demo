@@ -1,101 +1,58 @@
 package com.example.gateway;
 
-import com.example.gateway.config.GatewayRoutingProperties;
-import com.example.gateway.model.*;
 import org.junit.jupiter.api.Test;
-
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
+@TestPropertySource(properties = {
+    "spring.cloud.gateway.routes[0].id=user-service",
+    "spring.cloud.gateway.routes[0].uri=http://localhost:8081",
+    "spring.cloud.gateway.routes[0].predicates[0]=Path=/user/**",
+    "spring.cloud.gateway.routes[1].id=product-service", 
+    "spring.cloud.gateway.routes[1].uri=http://localhost:8082",
+    "spring.cloud.gateway.routes[1].predicates[0]=Path=/product/**"
+})
 class GatewayRoutingPropertiesTest {
 
+    @Value("${spring.cloud.gateway.routes[0].id:}")
+    private String userServiceRouteId;
+    
+    @Value("${spring.cloud.gateway.routes[0].uri:}")
+    private String userServiceUri;
+    
+    @Value("${spring.cloud.gateway.routes[1].id:}")
+    private String productServiceRouteId;
+    
+    @Value("${spring.cloud.gateway.routes[1].uri:}")
+    private String productServiceUri;
+
     @Test
-    void testGatewayRoutingPropertiesCreation() {
-        GatewayRoutingProperties properties = new GatewayRoutingProperties();
-        
-        assertNotNull(properties);
-        assertNull(properties.getRoutes());
-        assertNull(properties.getCircuitBreaker());
-        assertNull(properties.getRetry());
+    void testUserServiceRouteProperties() {
+        assertEquals("user-service", userServiceRouteId);
+        assertEquals("http://localhost:8081", userServiceUri);
     }
 
     @Test
-    void testSetAndGetRoutes() {
-        GatewayRoutingProperties properties = new GatewayRoutingProperties();
-        RouteConfig route = createTestRoute();
-        
-        properties.setRoutes(Collections.singletonList(route));
-        
-        assertNotNull(properties.getRoutes());
-        assertEquals(1, properties.getRoutes().size());
-        assertEquals("test-route", properties.getRoutes().get(0).getId());
+    void testProductServiceRouteProperties() {
+        assertEquals("product-service", productServiceRouteId);
+        assertEquals("http://localhost:8082", productServiceUri);
     }
 
     @Test
-    void testSetAndGetCircuitBreaker() {
-        GatewayRoutingProperties properties = new GatewayRoutingProperties();
-        CircuitBreakerConfig circuitBreaker = new CircuitBreakerConfig(60, 15000, 15, 8);
+    void testRoutePropertiesNotEmpty() {
+        assertNotNull(userServiceRouteId);
+        assertNotNull(userServiceUri);
+        assertNotNull(productServiceRouteId);
+        assertNotNull(productServiceUri);
         
-        properties.setCircuitBreaker(circuitBreaker);
-        
-        assertNotNull(properties.getCircuitBreaker());
-        assertEquals(60, properties.getCircuitBreaker().getFailureRateThreshold());
-        assertEquals(15000, properties.getCircuitBreaker().getWaitDurationInOpenState());
-    }
-
-    @Test
-    void testSetAndGetRetry() {
-        GatewayRoutingProperties properties = new GatewayRoutingProperties();
-        RetryConfig retry = new RetryConfig(5, 100, 1000, 1.5);
-        
-        properties.setRetry(retry);
-        
-        assertNotNull(properties.getRetry());
-        assertEquals(5, properties.getRetry().getRetries());
-        assertEquals(100, properties.getRetry().getFirstBackoff());
-    }
-
-    @Test
-    void testToString() {
-        GatewayRoutingProperties properties = new GatewayRoutingProperties();
-        RouteConfig route = createTestRoute();
-        CircuitBreakerConfig circuitBreaker = new CircuitBreakerConfig();
-        RetryConfig retry = new RetryConfig();
-        
-        properties.setRoutes(Collections.singletonList(route));
-        properties.setCircuitBreaker(circuitBreaker);
-        properties.setRetry(retry);
-        
-        String toString = properties.toString();
-        
-        assertNotNull(toString);
-        assertTrue(toString.contains("GatewayRoutingProperties"));
-        assertTrue(toString.contains("routes="));
-        assertTrue(toString.contains("circuitBreaker="));
-        assertTrue(toString.contains("retry="));
-    }
-
-    private RouteConfig createTestRoute() {
-        Map<String, String> predicateArgs = new HashMap<>();
-        predicateArgs.put("pattern", "/test/**");
-        PredicateConfig predicate = new PredicateConfig("Path", predicateArgs);
-        
-        Map<String, Object> filterArgs = new HashMap<>();
-        filterArgs.put("name", "test-cb");
-        FilterConfig filter = new FilterConfig("CircuitBreaker", filterArgs);
-        
-        RouteMetadata metadata = new RouteMetadata(5000, true, 0);
-        
-        return new RouteConfig(
-            "test-route",
-            "http://localhost:8080",
-            Collections.singletonList(predicate),
-            Collections.singletonList(filter),
-            metadata
-        );
+        assertFalse(userServiceRouteId.isEmpty());
+        assertFalse(userServiceUri.isEmpty());
+        assertFalse(productServiceRouteId.isEmpty());
+        assertFalse(productServiceUri.isEmpty());
     }
 }

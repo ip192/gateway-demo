@@ -7,10 +7,6 @@ spring:
           predicates:
             - Path=/user/**
           filters:
-            - name: CircuitBreaker
-              args:
-                name: user-service-cb
-                fallbackUri: forward:/fallback/user
             - name: Retry
               args:
                 retries: 3
@@ -26,10 +22,6 @@ spring:
           predicates:
             - Path=/product/**
           filters:
-            - name: CircuitBreaker
-              args:
-                name: product-service-cb
-                fallbackUri: forward:/fallback/product
             - name: Retry
               args:
                 retries: 3
@@ -41,31 +33,6 @@ spring:
                   factor: 2
                   basedOnPreviousValue: false
 
-# Resilience4j Circuit Breaker Configuration for testing
-resilience4j:
-  circuitbreaker:
-    instances:
-      user-service-cb:
-        slidingWindowSize: 5
-        minimumNumberOfCalls: 3
-        failureRateThreshold: 50
-        waitDurationInOpenState: 5s
-        permittedNumberOfCallsInHalfOpenState: 2
-        registerHealthIndicator: true
-      product-service-cb:
-        slidingWindowSize: 5
-        minimumNumberOfCalls: 3
-        failureRateThreshold: 50
-        waitDurationInOpenState: 5s
-        permittedNumberOfCallsInHalfOpenState: 2
-        registerHealthIndicator: true
-  timelimiter:
-    instances:
-      user-service-cb:
-        timeoutDuration: 2s
-      product-service-cb:
-        timeoutDuration: 2s
-
 # HTTP Client Configuration for testing
 spring.cloud.gateway.httpclient:
   connect-timeout: 2000
@@ -76,4 +43,3 @@ logging:
   level:
     com.example.gateway: DEBUG
     org.springframework.cloud.gateway: DEBUG
-    io.github.resilience4j: DEBUG

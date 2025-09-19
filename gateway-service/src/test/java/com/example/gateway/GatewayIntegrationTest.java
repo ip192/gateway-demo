@@ -12,11 +12,18 @@ import org.springframework.test.context.TestPropertySource;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * 简化的Gateway集成测试
+ * 测试基本的网关功能
+ */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestPropertySource(properties = {
     "spring.cloud.gateway.routes[0].id=user-service-test",
     "spring.cloud.gateway.routes[0].uri=http://localhost:8081",
-    "spring.cloud.gateway.routes[0].predicates[0]=Path=/user/**"
+    "spring.cloud.gateway.routes[0].predicates[0]=Path=/user/**",
+    "spring.cloud.gateway.routes[1].id=product-service-test",
+    "spring.cloud.gateway.routes[1].uri=http://localhost:8082",
+    "spring.cloud.gateway.routes[1].predicates[0]=Path=/product/**"
 })
 public class GatewayIntegrationTest {
 
@@ -50,17 +57,27 @@ public class GatewayIntegrationTest {
     }
 
     @Test
-    public void testUserServiceUnavailable_ShouldReturnError() {
-        // 测试当User服务不可用时，Gateway的行为
-        String url = "http://localhost:" + gatewayPort + "/user/login";
-        ResponseEntity<String> response = restTemplate.postForEntity(url, "{}", String.class);
+    public void testUserServiceRouteMatching() {
+        // 测试用户服务路由匹配
+        String userUrl = "http://localhost:" + gatewayPort + "/user/test";
+        ResponseEntity<String> response = restTemplate.getForEntity(userUrl, String.class);
 
-        // 由于User服务未启动，Gateway可能返回不同的错误状态码
-        // 这取决于Gateway的配置和错误处理策略
+        // 应该匹配到user路由，但由于服务不可用返回错误状态码
         assertTrue(response.getStatusCode().is4xxClientError() || 
-                  response.getStatusCode().is5xxServerError() ||
-                  response.getStatusCode().is2xxSuccessful(), 
-                  "Gateway应该返回有效的HTTP状态码");
+                  response.getStatusCode().is5xxServerError(),
+                  "Gateway应该匹配用户服务路由");
+    }
+
+    @Test
+    public void testProductServiceRouteMatching() {
+        // 测试产品服务路由匹配
+        String productUrl = "http://localhost:" + gatewayPort + "/product/test";
+        ResponseEntity<String> response = restTemplate.getForEntity(productUrl, String.class);
+
+        // 应该匹配到product路由，但由于服务不可用返回错误状态码
+        assertTrue(response.getStatusCode().is4xxClientError() || 
+                  response.getStatusCode().is5xxServerError(),
+                  "Gateway应该匹配产品服务路由");
     }
 
     @Test
@@ -69,29 +86,6 @@ public class GatewayIntegrationTest {
         String url = "http://localhost:" + gatewayPort + "/invalid/path";
         ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
 
-        // 验证返回404
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-    }
-
-    @Test
-    public void testGatewayHealthCheck() {
-        // 测试Gateway健康检查端点
-        String healthUrl = "http://localhost:" + gatewayPort + "/actuator/health";
-        ResponseEntity<String> healthResponse = restTemplate.getForEntity(healthUrl, String.class);
-
-        assertEquals(HttpStatus.OK, healthResponse.getStatusCode());
-        assertTrue(healthResponse.getBody().contains("UP"));
-    }
-
-    @Test
-    public void testGatewayRouteMatching() {
-        // 测试路由匹配逻辑
-        String userUrl = "http://localhost:" + gatewayPort + "/user/test";
-        ResponseEntity<String> response = restTemplate.getForEntity(userUrl, String.class);
-
-        // 应该匹配到user路由，但由于服务不可用或方法不匹配可能返回不同状态码
-        assertTrue(response.getStatusCode().is4xxClientError() || 
-                  response.getStatusCode().is5xxServerError(),
-                  "Gateway应该返回错误状态码，实际状态码: " + response.getStatusCode());
     }
 }

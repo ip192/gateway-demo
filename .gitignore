@@ -1,6 +1,14 @@
+.idea/
+.kiro/
+.codebuddy/
+.vscode
 # Compiled class file
 *.class
-
+target/
+gateway-service/target/
+eureka-service/target/
+product-service/target/
+user-service/target/
 # Log file
 *.log
 
