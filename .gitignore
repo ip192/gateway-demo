@@ -1,5 +1,5 @@
-#.idea/
-#.kiro/
+.idea/
+.kiro/
 .codebuddy/
 .vscode
 # Compiled class file
