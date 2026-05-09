@@ -6,7 +6,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.example</groupId>
-    <artifactId>spring-cloud-gateway-user</artifactId>
+    <artifactId>gateway-demo</artifactId>
     <version>1.0.0</version>
     <packaging>pom</packaging>
 
