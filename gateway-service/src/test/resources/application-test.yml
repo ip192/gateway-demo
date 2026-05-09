@@ -34,9 +34,9 @@ spring:
                   basedOnPreviousValue: false
 
 # HTTP Client Configuration for testing
-spring.cloud.gateway.httpclient:
-  connect-timeout: 2000
-  response-timeout: 3s
+      httpclient:
+        connect-timeout: 2000
+        response-timeout: 3s
 
 # Logging configuration for tests
 logging:

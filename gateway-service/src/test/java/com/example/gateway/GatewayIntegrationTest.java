@@ -23,7 +23,8 @@ import static org.junit.jupiter.api.Assertions.*;
     "spring.cloud.gateway.routes[0].predicates[0]=Path=/user/**",
     "spring.cloud.gateway.routes[1].id=product-service-test",
     "spring.cloud.gateway.routes[1].uri=http://localhost:8082",
-    "spring.cloud.gateway.routes[1].predicates[0]=Path=/product/**"
+    "spring.cloud.gateway.routes[1].predicates[0]=Path=/product/**",
+    "eureka.client.enabled=false"
 })
 public class GatewayIntegrationTest {
 

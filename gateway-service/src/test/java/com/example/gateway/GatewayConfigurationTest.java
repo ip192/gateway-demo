@@ -1,12 +1,16 @@
 package com.example.gateway;
 
+import com.example.gateway.client.UserServiceClient;
+import com.example.gateway.client.ProductServiceClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.web.server.LocalServerPort;
 import org.springframework.cloud.gateway.route.Route;
 import org.springframework.cloud.gateway.route.RouteLocator;
+import org.springframework.cloud.netflix.eureka.EurekaClientConfigBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.test.context.TestPropertySource;
@@ -28,14 +32,20 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestPropertySource(properties = {
+    "spring.application.name=gateway-service",
     "spring.cloud.gateway.routes[0].id=user-service",
-    "spring.cloud.gateway.routes[0].uri=http://localhost:8081",
+    "spring.cloud.gateway.routes[0].uri=lb://user-service",
     "spring.cloud.gateway.routes[0].predicates[0]=Path=/user/**",
     "spring.cloud.gateway.routes[1].id=product-service",
-    "spring.cloud.gateway.routes[1].uri=http://localhost:8082",
+    "spring.cloud.gateway.routes[1].uri=lb://product-service",
     "spring.cloud.gateway.routes[1].predicates[0]=Path=/product/**",
     "spring.cloud.gateway.httpclient.connect-timeout=5000",
-    "spring.cloud.gateway.httpclient.response-timeout=10s"
+    "spring.cloud.gateway.httpclient.response-timeout=10s",
+    "eureka.client.service-url.defaultZone=http://localhost:8083/eureka/",
+    "eureka.client.register-with-eureka=true",
+    "eureka.client.fetch-registry=true",
+    "feign.client.config.default.connect-timeout=5000",
+    "feign.client.config.default.read-timeout=5000"
 })
 class GatewayConfigurationTest {
 
@@ -45,14 +55,26 @@ class GatewayConfigurationTest {
     @Autowired
     private RouteLocator routeLocator;
 
+    @MockBean
+    private EurekaClientConfigBean eurekaClientConfigBean;
+
     @LocalServerPort
     private int serverPort;
+
+    @Value("${spring.application.name:}")
+    private String applicationName;
 
     @Value("${spring.cloud.gateway.httpclient.connect-timeout:5000}")
     private int connectTimeout;
 
     @Value("${spring.cloud.gateway.httpclient.response-timeout:10s}")
     private String responseTimeout;
+
+    @Value("${eureka.client.service-url.defaultZone:}")
+    private String eurekaServiceUrl;
+
+    @Value("${feign.client.config.default.connect-timeout:5000}")
+    private int feignConnectTimeout;
 
     @Value("${logging.level.org.springframework.cloud.gateway:INFO}")
     private String gatewayLogLevel;
@@ -107,11 +129,11 @@ class GatewayConfigurationTest {
                     assertNotNull(uri, "Route URI should not be null for route: " + route.getId());
                     
                     if ("user-service".equals(route.getId())) {
-                        assertEquals("http://localhost:8081", uri.toString(), 
-                            "User service URI should be http://localhost:8081");
+                        assertEquals("lb://user-service", uri.toString(), 
+                            "User service URI should use load balancer");
                     } else if ("product-service".equals(route.getId())) {
-                        assertEquals("http://localhost:8082", uri.toString(), 
-                            "Product service URI should be http://localhost:8082");
+                        assertEquals("lb://product-service", uri.toString(), 
+                            "Product service URI should use load balancer");
                     }
                 });
             })
@@ -171,9 +193,8 @@ class GatewayConfigurationTest {
                 routeList.forEach(route -> {
                     URI uri = route.getUri();
                     assertNotNull(uri, "Route URI should not be null");
-                    assertTrue(uri.toString().startsWith("http://"), 
-                        "Route URI should start with http://");
-                    assertTrue(uri.getPort() > 0, "Route URI should have a valid port");
+                    assertTrue(uri.toString().startsWith("lb://"), 
+                        "Route URI should start with lb:// for load balancing");
                 });
             })
             .expectComplete()
@@ -194,5 +215,65 @@ class GatewayConfigurationTest {
         // 验证日志配置
         assertNotNull(gatewayLogLevel, "Gateway log level should be configured");
         assertNotNull(applicationLogLevel, "Application log level should be configured");
+    }
+
+    @Test
+    void testEurekaClientConfiguration() {
+        // 验证Eureka客户端配置
+        assertEquals("gateway-service", applicationName, "Application name should be gateway-service");
+        assertEquals("http://localhost:8083/eureka/", eurekaServiceUrl, 
+            "Eureka service URL should be configured");
+        
+        // 验证Eureka相关Bean存在
+        assertTrue(applicationContext.containsBean("eurekaClient") || 
+                  applicationContext.getBeansOfType(com.netflix.discovery.EurekaClient.class).size() > 0,
+            "EurekaClient bean should be present");
+    }
+
+    @Test
+    void testFeignClientConfiguration() {
+        // 验证Feign客户端配置
+        assertEquals(5000, feignConnectTimeout, "Feign connect timeout should be 5000ms");
+        
+        // 验证Feign客户端Bean存在
+        assertTrue(applicationContext.getBeansOfType(UserServiceClient.class).size() > 0,
+            "UserServiceClient bean should be present");
+        assertTrue(applicationContext.getBeansOfType(ProductServiceClient.class).size() > 0,
+            "ProductServiceClient bean should be present");
+    }
+
+    @Test
+    void testLoadBalancedRouteConfiguration() {
+        // 验证负载均衡路由配置
+        Flux<Route> routes = routeLocator.getRoutes();
+        
+        StepVerifier.create(routes.collectList())
+            .assertNext(routeList -> {
+                routeList.forEach(route -> {
+                    URI uri = route.getUri();
+                    assertNotNull(uri, "Route URI should not be null");
+                    
+                    if ("user-service".equals(route.getId())) {
+                        assertEquals("lb://user-service", uri.toString(), 
+                            "User service URI should use load balancer");
+                    } else if ("product-service".equals(route.getId())) {
+                        assertEquals("lb://product-service", uri.toString(), 
+                            "Product service URI should use load balancer");
+                    }
+                });
+            })
+            .expectComplete()
+            .verify(Duration.ofSeconds(5));
+    }
+
+    @Test
+    void testServiceDiscoveryIntegration() {
+        // 验证服务发现集成
+        assertNotNull(applicationName, "Application name should be configured for service registration");
+        assertFalse(applicationName.isEmpty(), "Application name should not be empty");
+        
+        // 验证Eureka配置存在
+        assertNotNull(eurekaServiceUrl, "Eureka service URL should be configured");
+        assertTrue(eurekaServiceUrl.contains("eureka"), "Eureka service URL should contain 'eureka'");
     }
 }
